@@ -38,9 +38,9 @@ final class Installation_Controller {
 	}
 
 	/** Aucun formulaire FTP ne doit être injecté dans une réponse JSON. */
-	private function prepare_filesystem() {
+	private function prepare_filesystem( $context = WP_PLUGIN_DIR ) {
 		require_once ABSPATH . 'wp-admin/includes/file.php';
-		if ( 'direct' !== get_filesystem_method( array(), WP_PLUGIN_DIR ) ) {
+		if ( 'direct' !== get_filesystem_method( array(), $context ) ) {
 			$this->fail( __( 'Votre hébergement exige des identifiants FTP/SSH. Demandez à votre hébergeur un accès direct en écriture pour WordPress, ou installez les extensions depuis Extensions > Ajouter.', 'wp-starter-pack' ) );
 		}
 		if ( ! WP_Filesystem() ) {
@@ -51,8 +51,9 @@ final class Installation_Controller {
 	public function start() {
 		$this->authorize();
 		$selected = isset( $_POST['plugins'] ) ? wp_unslash( $_POST['plugins'] ) : array();
-		if ( ! is_array( $selected ) || empty( $selected ) || count( $selected ) > 5 ) {
-			$this->fail( __( 'Sélectionnez entre un et cinq modules.', 'wp-starter-pack' ) );
+		$themes = isset( $_POST['themes'] ) ? wp_unslash( $_POST['themes'] ) : array();
+		if ( ! is_array( $selected ) || ! is_array( $themes ) || ( empty( $selected ) && empty( $themes ) ) || count( $selected ) > count( Plugin_Catalog::all() ) || count( $themes ) > count( Theme_Catalog::all() ) ) {
+			$this->fail( __( 'Sélectionnez au moins un module ou un thème du catalogue.', 'wp-starter-pack' ) );
 		}
 		$catalog = Plugin_Catalog::all();
 		foreach ( $selected as $slug ) {
@@ -60,22 +61,48 @@ final class Installation_Controller {
 				$this->fail( __( 'Un module sélectionné ne figure pas dans le catalogue.', 'wp-starter-pack' ) );
 			}
 		}
+		// Elementor est une dépendance des addons, pas de WP Mail SMTP.
+		foreach ( $selected as $slug ) {
+			if ( ! empty( $catalog[ $slug ]['requires_parent'] ) ) {
+				array_unshift( $selected, $catalog[ $slug ]['requires_parent'] );
+			}
+		}
+		$theme_catalog = Theme_Catalog::all();
+		foreach ( $themes as $slug ) {
+			if ( ! is_string( $slug ) || ! isset( $theme_catalog[ $slug ] ) ) {
+				$this->fail( __( 'Un thème sélectionné ne figure pas dans le catalogue.', 'wp-starter-pack' ) );
+			}
+		}
+		if ( $themes && ! current_user_can( 'install_themes' ) ) {
+			$this->fail( __( 'Vous ne pouvez pas installer de thèmes.', 'wp-starter-pack' ), 403 );
+		}
 		$remove = isset( $_POST['remove'] ) && '1' === $_POST['remove'];
 		if ( $remove && ! current_user_can( 'delete_plugins' ) ) {
 			$this->fail( __( 'Vous ne pouvez pas supprimer Starter Pack.', 'wp-starter-pack' ), 403 );
 		}
 		$this->prepare_filesystem();
+		if ( $themes ) {
+			$this->prepare_filesystem( get_theme_root() );
+		}
 		$token = wp_generate_uuid4();
-		$session = array( 'plugins' => array_values( array_unique( $selected ) ), 'remove' => $remove );
+		$session = array( 'plugins' => array_values( array_unique( $selected ) ), 'themes' => array_values( array_unique( $themes ) ), 'remove' => $remove );
 		if ( ! set_transient( $this->session_key( $token ), $session, HOUR_IN_SECONDS ) ) {
 			$this->fail( __( 'Impossible de préparer l’installation. Réessayez.', 'wp-starter-pack' ) );
 		}
-		wp_send_json_success( array( 'token' => $token ) );
+		wp_send_json_success( array( 'token' => $token, 'plugins' => $session['plugins'], 'themes' => $session['themes'] ) );
 	}
 
 	public function install() {
 		$this->authorize();
 		list( $token, $session ) = $this->session();
+		$type = isset( $_POST['type'] ) ? $_POST['type'] : 'plugin';
+		if ( 'theme' === $type ) {
+			$this->install_theme( $session );
+			return;
+		}
+		if ( 'plugin' !== $type ) {
+			$this->fail( __( 'Type d’installation inconnu.', 'wp-starter-pack' ) );
+		}
 		$slug = isset( $_POST['slug'] ) && is_string( $_POST['slug'] ) ? sanitize_key( wp_unslash( $_POST['slug'] ) ) : '';
 		if ( ! in_array( $slug, $session['plugins'], true ) ) {
 			$this->fail( __( 'Ce module ne fait pas partie de votre sélection.', 'wp-starter-pack' ) );
@@ -83,6 +110,10 @@ final class Installation_Controller {
 		wp_clean_plugins_cache( false );
 		if ( Plugin_Catalog::is_installed( $slug ) ) {
 			wp_send_json_success( array( 'installed' => true ) );
+		}
+		$catalog = Plugin_Catalog::all();
+		if ( ! empty( $catalog[ $slug ]['requires_parent'] ) && ! Plugin_Catalog::is_installed( $catalog[ $slug ]['requires_parent'] ) ) {
+			$this->fail( __( 'Installez Elementor avant cet addon.', 'wp-starter-pack' ) );
 		}
 		$this->prepare_filesystem();
 		require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
@@ -121,6 +152,50 @@ final class Installation_Controller {
 		wp_send_json_success( array( 'installed' => true ) );
 	}
 
+	private function install_theme( $session ) {
+		if ( ! current_user_can( 'install_themes' ) ) {
+			$this->fail( __( 'Vous ne pouvez pas installer de thèmes.', 'wp-starter-pack' ), 403 );
+		}
+		$slug = isset( $_POST['slug'] ) && is_string( $_POST['slug'] ) ? sanitize_key( wp_unslash( $_POST['slug'] ) ) : '';
+		if ( ! in_array( $slug, $session['themes'] ?? array(), true ) ) {
+			$this->fail( __( 'Ce thème ne fait pas partie de votre sélection.', 'wp-starter-pack' ) );
+		}
+		wp_clean_themes_cache( false );
+		if ( Theme_Catalog::is_installed( $slug ) ) {
+			wp_send_json_success( array( 'installed' => true ) );
+		}
+		$this->prepare_filesystem( get_theme_root() );
+		require_once ABSPATH . 'wp-admin/includes/theme.php';
+		require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+		$information = themes_api( 'theme_information', array( 'slug' => $slug, 'fields' => array( 'downloadlink' => true ) ) );
+		if ( is_wp_error( $information ) ) {
+			$this->fail( $information->get_error_message() );
+		}
+		if ( empty( $information->download_link ) ) {
+			$this->fail( __( 'Téléchargement du thème indisponible sur WordPress.org.', 'wp-starter-pack' ) );
+		}
+		if ( ( ! empty( $information->requires ) && ! is_wp_version_compatible( $information->requires ) ) || ( ! empty( $information->requires_php ) && ! is_php_version_compatible( $information->requires_php ) ) ) {
+			$this->fail( __( 'Votre version de WordPress ou de PHP est trop ancienne pour ce thème.', 'wp-starter-pack' ) );
+		}
+		$skin = new \WP_Ajax_Upgrader_Skin();
+		$upgrader = new \Theme_Upgrader( $skin );
+		$result = $upgrader->install( $information->download_link );
+		if ( is_wp_error( $result ) ) {
+			$this->fail( $result->get_error_message() );
+		}
+		if ( is_wp_error( $skin->result ) ) {
+			$this->fail( $skin->result->get_error_message() );
+		}
+		if ( $skin->get_errors()->has_errors() ) {
+			$this->fail( $skin->get_errors()->get_error_message() );
+		}
+		wp_clean_themes_cache( false );
+		if ( true !== $result || ! Theme_Catalog::is_installed( $slug ) ) {
+			$this->fail( __( 'L’installation du thème n’a pas abouti. Vérifiez l’espace disque et les permissions.', 'wp-starter-pack' ) );
+		}
+		wp_send_json_success( array( 'installed' => true ) );
+	}
+
 	public function finish() {
 		$this->authorize();
 		list( $token, $session ) = $this->session();
@@ -129,6 +204,12 @@ final class Installation_Controller {
 		foreach ( $session['plugins'] as $slug ) {
 			if ( ! Plugin_Catalog::is_installed( $slug ) ) {
 				$this->fail( __( 'Au moins un module manque. Starter Pack a été conservé.', 'wp-starter-pack' ) );
+			}
+		}
+		wp_clean_themes_cache( false );
+		foreach ( $session['themes'] ?? array() as $slug ) {
+			if ( ! Theme_Catalog::is_installed( $slug ) ) {
+				$this->fail( __( 'Au moins un thème manque. Starter Pack a été conservé.', 'wp-starter-pack' ) );
 			}
 		}
 		if ( ! $session['remove'] ) {

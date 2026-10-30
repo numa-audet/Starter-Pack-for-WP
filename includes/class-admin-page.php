@@ -29,18 +29,23 @@ final class Admin_Page {
 		$url = plugin_dir_url( WP_STARTER_PACK_FILE );
 		wp_enqueue_style( 'wp-starter-pack', $url . 'assets/css/admin.css', array(), WP_STARTER_PACK_VERSION );
 		wp_enqueue_script( 'wp-starter-pack', $url . 'assets/js/admin.js', array(), WP_STARTER_PACK_VERSION, true );
+		wp_enqueue_script( 'wp-starter-pack-metadata', $url . 'assets/js/directory-metadata.js', array( 'wp-starter-pack' ), WP_STARTER_PACK_VERSION, true );
 		wp_localize_script( 'wp-starter-pack', 'wpStarterPack', array(
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce' => wp_create_nonce( 'wp_starter_pack_install' ),
+			'activationNonce' => wp_create_nonce( 'wp_starter_pack_activate' ),
+			'metadataNonce' => wp_create_nonce( 'wp_starter_pack_metadata' ),
 			'pluginsUrl' => network_admin_url( 'plugins.php' ),
 			'messages' => array(
 				'networkError' => __( 'La réponse du serveur est invalide ou la connexion a été interrompue. Rechargez la page pour vérifier les installations avant de réessayer.', 'wp-starter-pack' ),
-				'choose' => __( 'Sélectionnez au moins un module.', 'wp-starter-pack' ),
+				'choose' => __( 'Sélectionnez au moins un module ou un thème.', 'wp-starter-pack' ),
+				'metadataUnavailable' => __( 'Informations WordPress.org indisponibles pour le moment.', 'wp-starter-pack' ),
 				'installing' => __( 'Installation en cours…', 'wp-starter-pack' ),
 				'installed' => __( 'Installé', 'wp-starter-pack' ),
 				'failed' => __( 'Échec', 'wp-starter-pack' ),
 				'partial' => __( 'Certaines installations ont échoué. Starter Pack a été conservé. Vous pouvez réessayer les modules en échec.', 'wp-starter-pack' ),
-				'done' => __( 'Les modules sélectionnés sont installés. Vous pouvez maintenant les activer et les configurer dans Extensions.', 'wp-starter-pack' ),
+				'done' => __( 'Votre sélection est installée. Les modules peuvent être activés avec « Activer et configurer ». Retrouvez les thèmes dans Apparence ; le thème actif n’a pas été modifié.', 'wp-starter-pack' ),
+				'activating' => __( 'Activation en cours…', 'wp-starter-pack' ),
 				'deleted' => __( 'Les modules sont installés et Starter Pack a été supprimé. Vous pouvez maintenant activer vos extensions.', 'wp-starter-pack' ),
 				'finalizing' => __( 'Vérification des installations…', 'wp-starter-pack' ),
 			),
@@ -52,6 +57,16 @@ final class Admin_Page {
 			wp_die( esc_html__( 'Vous ne pouvez pas installer d’extensions sur ce site.', 'wp-starter-pack' ) );
 		}
 		$catalog = Plugin_Catalog::all();
+		$themes = Theme_Catalog::all();
 		require dirname( __DIR__ ) . '/templates/admin-page.php';
+	}
+
+	public function render_item( $type, $slug, $module ) {
+		$is_theme = 'theme' === $type;
+		$installed = $is_theme ? Theme_Catalog::is_installed( $slug ) : Plugin_Catalog::is_installed( $slug );
+		$active = ! $is_theme && $installed && is_plugin_active( $module['file'] );
+		$can_activate = ! $is_theme && current_user_can( 'activate_plugin', $module['file'] ) && ( ! is_multisite() || current_user_can( 'manage_network_plugins' ) );
+		$children = $is_theme ? array() : Plugin_Catalog::children( $slug );
+		require dirname( __DIR__ ) . '/templates/catalog-item.php';
 	}
 }
