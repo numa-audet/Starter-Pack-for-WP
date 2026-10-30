@@ -16,7 +16,7 @@
 .wsp-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 28px; border-bottom: 1px solid #e7ecee; }
 .wsp-panel-heading h2 { margin: 0; font-size: 17px; }
 .wsp-panel-heading > span { color: var(--wsp-muted); font-size: 12px; }
-.wsp-section-selection { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 28px; border-bottom: 1px solid #edf0f1; background: #f8faf9; }
+.wsp-section-selection { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 28px; border-bottom: 1px solid #edf0f1; background: #e0e0e0; }
 .wsp-section-selection > label:first-child { cursor: pointer; font-weight: 600; }
 .wsp-section-selection .wsp-switch { margin-left: 0; }
 .wsp-modules { padding: 0; margin: 0; list-style: none; }

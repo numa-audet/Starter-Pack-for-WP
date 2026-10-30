@@ -14,7 +14,7 @@ final class Admin_Page {
 	}
 
 	public function add_menu() {
-		$this->hook = add_menu_page( 'WP Starter Pack', 'Starter Pack', 'install_plugins', 'wp-starter-pack', array( $this, 'render' ), 'dashicons-screenoptions', 65 );
+		$this->hook = add_menu_page( 'WP Starter Pack', 'Starter Pack', 'install_plugins', 'wp-starter-pack', array( $this, 'render' ), plugin_dir_url( WP_STARTER_PACK_FILE ) . 'img/starter-pack-for-WP_icone.png', 65 );
 	}
 
 	public function action_links( $links ) {
@@ -23,6 +23,7 @@ final class Admin_Page {
 	}
 
 	public function enqueue_assets( $hook ) {
+		wp_add_inline_style( 'common', '#toplevel_page_wp-starter-pack .wp-menu-image img { width: 20px; height: 20px; object-fit: contain; }' );
 		if ( $hook !== $this->hook ) {
 			return;
 		}

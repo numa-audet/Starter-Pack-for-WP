@@ -1,0 +1,5 @@
+# Fichiers système macOS
+.DS_Store
+
+# Dossier de distribution
+/dist/

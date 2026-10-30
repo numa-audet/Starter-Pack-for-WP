@@ -16,7 +16,7 @@ Cocher un addon Elementor sélectionne aussi Elementor si nécessaire. Décocher
 
 ## Installation
 
-1. Compressez le dossier du plugin en ZIP, avec `wp-starter-pack.php`, `includes/`, `templates/` et `assets/` dans un même dossier racine.
+1. Compressez le dossier du plugin en ZIP, avec `wp-starter-pack.php`, `includes/`, `templates/`, `assets/` et `img/` dans un même dossier racine.
 2. Dans WordPress, ouvrez **Extensions → Ajouter une extension → Téléverser une extension**.
 3. Téléversez l’archive, installez puis activez **WP Starter Pack**.
 4. Ouvrez **Starter Pack** dans le menu d’administration, sélectionnez vos modules et cliquez sur **Installer les modules**.

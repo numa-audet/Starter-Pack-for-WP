@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP Starter Pack
  * Description: Installez une sélection d’extensions WordPress depuis une interface simple, puis supprimez éventuellement Starter Pack.
- * Version: 0.0.2
+ * Version: 0.0.3
  * Requires at least: 6.5
  * Requires PHP: 7.4
  * Author: Numa Audet
@@ -15,7 +15,7 @@ namespace WPStarterPack;
 defined( 'ABSPATH' ) || exit;
 
 define( 'WP_STARTER_PACK_FILE', __FILE__ );
-define( 'WP_STARTER_PACK_VERSION', '0.0.2' );
+define( 'WP_STARTER_PACK_VERSION', '1.0.0' );
 
 require_once __DIR__ . '/includes/class-plugin-catalog.php';
 require_once __DIR__ . '/includes/class-theme-catalog.php';
